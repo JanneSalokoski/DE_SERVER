@@ -18,7 +18,7 @@ function main() {
 	app.use(express.json());
 
 	const server = http.createServer(app);
-	const port = 3000;
+	//const port = 3000;
 
 	const wss = new WebSocket.Server({ server });
 
@@ -276,6 +276,10 @@ function main() {
 		});
 	});
 
+	let port = process.env.PORT;
+	if (port == null || port == "") {
+	  port = 8000;
+	}
 	server.listen(port, () => {
 		console.log('Server running.')
 	});
