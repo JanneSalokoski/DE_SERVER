@@ -204,8 +204,10 @@ function main() {
 
 	function end_election_handler(payload, connection) {
 		state.connections[connection].election_status = false;
+		//console.log("Votes: ", state.connections[connection].votes)
 		state.connections[connection].election_results = {
-			votes: state.connections[connection].votes,
+			votes: [...state.connections[connection].votes],
+			candidates: [...state.connections[connection].candidates]
 		}
 
 		state.connections[connection].socket.send(JSON.stringify({
@@ -220,7 +222,25 @@ function main() {
 			payload: {
 				election_results: state.connections[connection].election_results
 			}
-			}));
+		}));
+
+		state.connections[connection].socket.send(JSON.stringify({
+			type: 'update_candidates',
+			payload: {
+				candidates: []
+			}
+		}));
+
+		state.connections[connection].socket.send(JSON.stringify({
+			type: 'update_voters',
+			payload: {
+				unverified_voters: [],
+				verified_voters: []
+			}
+		}));
+
+		state.connections[connection].unverified_voters = [];
+		state.connections[connection].verified_voters = [];
 
 		state.connections[connection].clients.map(client => {
 			state.connections[client].socket.send(JSON.stringify({
