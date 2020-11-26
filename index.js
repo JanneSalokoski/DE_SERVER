@@ -58,7 +58,10 @@ function main() {
 		state.connections[connection].candidates.push({
 			id: readable_id(),
 			name: candidate.name,
-		});	
+			list: candidate.list !== '' ? candidate.list : candidate.name
+		});
+
+		console.log(candidate);
 
 		state.connections[connection].socket
 			.send(JSON.stringify({
@@ -202,13 +205,76 @@ function main() {
 		})
 	}
 
+	function getRandomIntInclusive(min, max) {
+	min = Math.ceil(min);
+	max = Math.floor(max);
+	return Math.floor(Math.random() * (max - min + 1) + min); //The maximum is inclusive and the minimum is inclusive 
+}
+
+function vote_sort(a, b) {
+	if (a.votes < b.votes) {
+		return -1;
+	}
+	else if (a.votes > b.votes) {
+		return 1;
+	}
+
+	return getRandomIntInclusive(0, 1) ? -1 : 1;
+}
+
+function compare_sort(a, b) {
+	if (a.compare_number > b.compare_number) {
+		return -1;
+	}
+	else if (a.compare_number < b.compare_number) {
+		return 1;
+	}
+
+	return getRandomIntInclusive(0, 1) ? -1 : 1;
+}
+
+function get_election_results(candidates, votes) {
+	const election_list_names = Array.from(
+		new Set(candidates.map(candidate => candidate.list))
+	);
+	
+	let election_lists = election_list_names.map(list_name => ({
+		name: list_name,
+
+		compare_number: candidates
+			.map(candidate => ({ ...candidate, votes: (votes.filter(vote => vote.candidate_id === candidate.id)).length }))
+			.filter(candidate => candidate.list === list_name)
+			.map(candidate => candidate.votes)
+			.reduce((acc, curr) => acc + curr),
+
+		candidates: candidates
+			.filter(candidate => candidate.list === list_name)
+			.map(candidate => ({ ...candidate, votes: (votes.filter(vote => vote.candidate_id === candidate.id)).length }))
+			.sort(vote_sort)
+	}));
+
+	election_lists = election_lists.map(election_list => ({
+		...election_list,
+		candidates: election_list.candidates
+			.map(candidate => ({
+				...candidate,
+				compare_number: election_list.compare_number / (election_list.candidates.length - election_list.candidates.indexOf(candidate))
+		})).sort(compare_sort)
+	}));
+
+	return {
+		candidates: election_lists
+			.map(list => list.candidates)
+			.flat()
+			.sort(compare_sort),
+
+		votes: votes
+	}
+}
+
 	function end_election_handler(payload, connection) {
 		state.connections[connection].election_status = false;
-		//console.log("Votes: ", state.connections[connection].votes)
-		state.connections[connection].election_results = {
-			votes: [...state.connections[connection].votes],
-			candidates: [...state.connections[connection].candidates]
-		}
+		state.connections[connection].election_results = get_election_results([...state.connections[connection].candidates], [...state.connections[connection].votes]);
 
 		state.connections[connection].socket.send(JSON.stringify({
 			type: 'update_election_status',
